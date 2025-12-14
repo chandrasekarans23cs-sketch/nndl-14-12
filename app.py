@@ -1,105 +1,115 @@
 # ========================================
 # Kidney Disease Prediction Using Deep Learning
-# Refined Streamlit App (Cloud Safe)
+# High Accuracy Streamlit App
 # ========================================
 
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"   # Suppress TF logs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
 # ----------------------------------------
-# Page Configuration
+# Page Config
 # ----------------------------------------
-st.set_page_config(
-    page_title="Kidney Disease Prediction",
-    page_icon="🧠",
-    layout="centered"
-)
-
-st.title("🧠 Kidney Disease Prediction")
-st.caption("Deep Learning (ANN) | Streamlit Cloud Deployment")
+st.set_page_config(page_title="Kidney Disease Prediction", page_icon="🧠")
+st.title("🧠 Kidney Disease Prediction (Deep Learning)")
 
 # ----------------------------------------
-# Load & Preprocess Data (Cached)
+# Load & Clean Data
 # ----------------------------------------
 @st.cache_data
-def load_and_preprocess_data():
+def load_data():
     df = pd.read_csv("kidney_disease.csv")
-
     df.replace("?", np.nan, inplace=True)
 
     if "id" in df.columns:
         df.drop("id", axis=1, inplace=True)
 
+    # Target mapping
+    df["classification"] = df["classification"].map({"ckd": 1, "notckd": 0})
+
+    # Binary mappings
+    binary_map = {
+        "yes": 1, "no": 0,
+        "present": 1, "notpresent": 0,
+        "abnormal": 1, "normal": 0,
+        "poor": 1, "good": 0
+    }
+
     for col in df.columns:
-        if df[col].dtype == "object":
-            df[col].fillna(df[col].mode()[0], inplace=True)
-        else:
-            df[col].fillna(df[col].mean(), inplace=True)
+        df[col] = df[col].replace(binary_map)
 
-    le = LabelEncoder()
+    # Fill missing values
     for col in df.columns:
-        if df[col].dtype == "object":
-            df[col] = le.fit_transform(df[col])
+        df[col].fillna(df[col].median(), inplace=True)
 
-    X = df.drop("classification", axis=1)
-    y = df["classification"]
+    return df
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    return X, X_train, X_test, y_train, y_test, scaler
-
-X, X_train, X_test, y_train, y_test, scaler = load_and_preprocess_data()
+df = load_data()
 
 # ----------------------------------------
-# Build & Train Model (Cached)
+# Train-Test Split
+# ----------------------------------------
+X = df.drop("classification", axis=1)
+y = df["classification"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Scaling
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# ----------------------------------------
+# Build Model
 # ----------------------------------------
 @st.cache_resource
-def train_model(X_train, y_train, input_dim):
+def train_model(X_train, y_train):
     model = Sequential([
-        Dense(32, activation="relu", input_dim=input_dim),
-        Dense(16, activation="relu"),
-        Dense(8, activation="relu"),
+        Dense(64, activation="relu", input_shape=(X_train.shape[1],)),
+        Dropout(0.3),
+        Dense(32, activation="relu"),
         Dense(1, activation="sigmoid")
     ])
 
     model.compile(
-        optimizer=Adam(learning_rate=0.001),
+        optimizer=Adam(0.001),
         loss="binary_crossentropy",
         metrics=["accuracy"]
     )
 
+    class_weights = {
+        0: len(y_train) / (2 * sum(y_train == 0)),
+        1: len(y_train) / (2 * sum(y_train == 1))
+    }
+
     model.fit(
         X_train,
         y_train,
-        epochs=20,          # Reduced for Streamlit Cloud stability
+        epochs=30,
         batch_size=16,
-        verbose=0
+        verbose=0,
+        class_weight=class_weights
     )
 
     return model
 
-model = train_model(X_train, y_train, X_train.shape[1])
+model = train_model(X_train, y_train)
 
 # ----------------------------------------
-# Model Performance
+# Evaluate
 # ----------------------------------------
 y_pred = (model.predict(X_test) > 0.5).astype(int)
 accuracy = accuracy_score(y_test, y_pred)
@@ -107,38 +117,25 @@ accuracy = accuracy_score(y_test, y_pred)
 st.success(f"✅ Model Accuracy: {accuracy * 100:.2f}%")
 
 # ----------------------------------------
-# User Input Section
+# User Input
 # ----------------------------------------
-st.subheader("📝 Enter Patient Details")
+st.subheader("📝 Patient Details")
+input_data = []
 
-input_values = []
 for col in X.columns:
-    value = st.number_input(
-        label=col,
-        value=float(X[col].mean()),
-        step=0.1
-    )
-    input_values.append(value)
+    value = st.number_input(col, float(X[col].median()))
+    input_data.append(value)
 
 # ----------------------------------------
 # Prediction
 # ----------------------------------------
 if st.button("🔍 Predict"):
-    input_array = np.array(input_values).reshape(1, -1)
+    input_array = np.array(input_data).reshape(1, -1)
     input_scaled = scaler.transform(input_array)
 
-    prediction = model.predict(input_scaled)[0][0]
+    result = model.predict(input_scaled)[0][0]
 
-    if prediction > 0.5:
-        st.error("⚠️ **Result: Chronic Kidney Disease Detected**")
+    if result > 0.5:
+        st.error("⚠️ Chronic Kidney Disease Detected")
     else:
-        st.success("🎉 **Result: No Kidney Disease Detected**")
-
-# ----------------------------------------
-# Footer
-# ----------------------------------------
-st.markdown("---")
-st.markdown(
-    "**Mini Project – Neural Networks & Deep Learning**  \n"
-    "Built with **TensorFlow, Scikit-learn & Streamlit**"
-)
+        st.success("🎉 No Kidney Disease Detected")
