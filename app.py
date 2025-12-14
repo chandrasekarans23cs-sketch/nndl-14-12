@@ -1,6 +1,6 @@
 # ============================================
 # Kidney Disease Prediction Using Deep Learning
-# Streamlit Cloud – FINAL REFINED VERSION
+# FINAL BULLETPROOF STREAMLIT APP
 # ============================================
 
 import os
@@ -19,7 +19,7 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
 # --------------------------------------------
-# Streamlit Page Config
+# Page Config
 # --------------------------------------------
 st.set_page_config(
     page_title="Kidney Disease Prediction",
@@ -31,7 +31,7 @@ st.title("🧠 Kidney Disease Prediction")
 st.caption("Deep Learning Mini Project | Streamlit Cloud")
 
 # --------------------------------------------
-# Load & Clean Dataset (SAFE VERSION)
+# Load & Clean Dataset (100% SAFE)
 # --------------------------------------------
 @st.cache_data
 def load_data():
@@ -44,18 +44,18 @@ def load_data():
     if "id" in df.columns:
         df.drop("id", axis=1, inplace=True)
 
-    # Strip spaces in string columns
+    # Strip spaces
     for col in df.columns:
         if df[col].dtype == object:
             df[col] = df[col].str.strip()
 
-    # Encode target column
+    # Target mapping
     df["classification"] = df["classification"].map({
         "ckd": 1,
         "notckd": 0
     })
 
-    # Binary categorical mapping
+    # Binary mappings
     binary_map = {
         "yes": 1, "no": 0,
         "present": 1, "notpresent": 0,
@@ -64,19 +64,20 @@ def load_data():
     }
     df.replace(binary_map, inplace=True)
 
-    # Fill missing values correctly
+    # Convert EVERYTHING to numeric safely
     for col in df.columns:
-        if df[col].dtype in ["int64", "float64"]:
-            df[col].fillna(df[col].median(), inplace=True)
-        else:
-            df[col].fillna(df[col].mode()[0], inplace=True)
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Fill missing values
+    for col in df.columns:
+        df[col].fillna(df[col].median(), inplace=True)
 
     return df
 
 df = load_data()
 
 # --------------------------------------------
-# Split Data
+# Split Features & Target
 # --------------------------------------------
 X = df.drop("classification", axis=1)
 y = df["classification"]
@@ -88,7 +89,9 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-# Scaling
+# --------------------------------------------
+# Scaling (NOW SAFE)
+# --------------------------------------------
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
@@ -111,7 +114,7 @@ def train_model(X_train, y_train):
         metrics=["accuracy"]
     )
 
-    # Handle class imbalance
+    # Handle imbalance
     class_weights = {
         0: len(y_train) / (2 * np.sum(y_train == 0)),
         1: len(y_train) / (2 * np.sum(y_train == 1))
@@ -131,7 +134,7 @@ def train_model(X_train, y_train):
 model = train_model(X_train, y_train)
 
 # --------------------------------------------
-# Evaluate Model
+# Evaluate
 # --------------------------------------------
 y_pred = (model.predict(X_test) > 0.5).astype(int)
 accuracy = accuracy_score(y_test, y_pred)
@@ -139,7 +142,7 @@ accuracy = accuracy_score(y_test, y_pred)
 st.success(f"✅ Model Accuracy: {accuracy * 100:.2f}%")
 
 # --------------------------------------------
-# User Input Section
+# User Input
 # --------------------------------------------
 st.subheader("📝 Enter Patient Medical Details")
 
@@ -172,5 +175,5 @@ if st.button("🔍 Predict Kidney Disease"):
 st.markdown("---")
 st.markdown(
     "**Neural Networks & Deep Learning Mini Project**  \n"
-    "Technologies: Python, TensorFlow, Scikit-Learn, Streamlit"
+    "Python • TensorFlow • Streamlit"
 )
