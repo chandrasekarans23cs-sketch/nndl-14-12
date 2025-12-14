@@ -28,7 +28,7 @@ st.set_page_config(
 )
 
 st.title("🧠 Kidney Disease Prediction")
-st.caption("Deep Learning Mini Project | Streamlit Cloud")
+st.caption("Developed by CHANDRASEKARAN S & Team")
 
 # --------------------------------------------
 # Load & Clean Dataset (100% SAFE)
